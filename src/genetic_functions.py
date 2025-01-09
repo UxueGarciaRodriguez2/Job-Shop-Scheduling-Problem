@@ -87,6 +87,26 @@ def generate_chromosome(num_jobs, num_machines):
 
     return chromosome
 
+def generate_valid_chromosome(num_jobs, num_machines, processing_times):
+    """
+    Generates a valid chromosome for the Job-Shop Scheduling Problem.
+    The chromosome should respect all the constraints.
+    """
+    while True:
+        chromosome = create_random_chromosome(num_jobs, num_machines)  # Esta es la función que genera un cromosoma aleatorio
+        if validate_chromosome(chromosome, num_jobs, num_machines, processing_times):
+            return chromosome  # Si el cromosoma es válido, lo devolvemos
+        # Si no es válido, generamos uno nuevo
+
+def create_random_chromosome(num_jobs, num_machines):
+    """
+    Generates a random chromosome (job sequence).
+    This function should be implemented based on how you want to represent the chromosome.
+    For simplicity, here we just generate a random sequence of job indices.
+    """
+    chromosome = [random.randint(0, num_jobs - 1) for _ in range(num_jobs * num_machines)]
+    return chromosome
+
 
 
 ##################################
@@ -96,38 +116,65 @@ def generate_chromosome(num_jobs, num_machines):
 def validate_chromosome(chromosome, num_jobs, num_machines, processing_times):
     """
     Validates a chromosome for JSSP constraints.
+    Ensures:
+    1. No task for a job can be started until the previous task for that job is completed.
+    2. A machine can only work on one task at a time.
+    3. A task, once started, must run to completion.
     """
     # Completion time tracking per job and machine
-    #Time for completion of each job
-    job_completion_time = [0] * num_jobs  
+    job_completion_time = [0] * num_jobs  # Completion time for each job
+    machine_completion_time = [0] * num_machines  # Completion time for each machine
 
-    # Time for completion of each machine
-    machine_completion_time = [0] * num_machines 
-
-    # Index
+    # Current operation index for each job
     job_operation_index = [0] * num_jobs
 
+    # Iterate over the chromosome
     for gene in chromosome:
-        job = gene  # Actual job
-        operation_idx = job_operation_index[job]  # Current operation index
+        job = gene  # Current job
+        operation_idx = job_operation_index[job]  # Current operation index for this job
 
-        # Assigned machine
-        machine = processing_times[job][operation_idx * 2] 
-        
-        # Process time
-        processing_time = processing_times[job][operation_idx * 2 + 1]  
+        # If the operation index exceeds the number of operations, it's invalid
+        if operation_idx >= len(processing_times[job]) // 2:
+            return False
 
-        # Calculate the start and end time for this operation
+        # Get machine and processing time for the current operation
+        machine = processing_times[job][operation_idx * 2]  # Machine assigned
+        processing_time = processing_times[job][operation_idx * 2 + 1]  # Processing time
+
+        # Calculate the start and finish time for this task
         start_time = max(job_completion_time[job], machine_completion_time[machine])
         finish_time = start_time + processing_time
 
-        # Maintain completion times
+        # Check if the machine is available during this period
+        if start_time < machine_completion_time[machine]:
+            return False  # Machine is busy
+
+        # Update completion times
         job_completion_time[job] = finish_time
         machine_completion_time[machine] = finish_time
 
+        # Move to the next operation for this job
         job_operation_index[job] += 1
 
+    # Ensure all operations for all jobs have been scheduled
+    for job_idx in range(num_jobs):
+        if job_operation_index[job_idx] != len(processing_times[job_idx]) // 2:
+            return False
+
     return True
+
+################################
+##### GENERATE POPULATION ######
+################################
+
+def generate_valid_population(num_jobs, num_machines, processing_times, population_size):
+    population = []
+    while len(population) < population_size:
+        chromosome = generate_chromosome(num_jobs, num_machines)
+        if validate_chromosome(chromosome, num_jobs, num_machines, processing_times):
+            population.append(chromosome)
+    return population
+
 
 #################################
 ##### CALCULATE THE FITNESS #####
@@ -171,6 +218,58 @@ def compute_fitness_with_validation(chromosome, num_jobs, num_machines, processi
         job_operation_index[job] += 1
 
     return max(machine_completion_time)
+
+
+def compute_fitness_with_penalty(chromosome, num_jobs, num_machines, processing_times):
+    """
+    Validates the chromosome and calculates the makespan with a penalty for invalid solutions.
+    
+    Args:
+        chromosome (list): Sequence of operations that defines a solution.
+        num_jobs (int): Number of jobs.
+        num_machines (int): Number of machines.
+        processing_times (list): Array defining the machines and times for each operation.
+    
+    returns:
+        float: Fitness of the solution with penalty if invalid.
+    """
+    penalty = 0
+    job_completion_time = [0] * num_jobs
+    machine_completion_time = [0] * num_machines
+    job_operation_index = [0] * num_jobs
+
+    for gene in chromosome:
+        job = gene  # Current job
+        operation_idx = job_operation_index[job]
+
+        # Verificar si hay suficientes operaciones para este trabajo
+        if operation_idx * 2 + 1 >= len(processing_times[job]):
+            #print(f"Warning: job {job} exceeds the available operations.")
+            penalty += 1000  # Penalización por exceder el número de operaciones
+            continue  # O puedes devolver un valor de penalización en este caso
+
+        machine = processing_times[job][operation_idx * 2]
+        processing_time = processing_times[job][operation_idx * 2 + 1]
+
+        start_time = max(job_completion_time[job], machine_completion_time[machine])
+        finish_time = start_time + processing_time
+
+        # Si la máquina está ocupada antes de que empiece la tarea, aplicar penalización
+        if start_time < machine_completion_time[machine]:
+            penalty += 500  # Penalización por tiempo de máquina ocupado
+
+        job_completion_time[job] = finish_time
+        machine_completion_time[machine] = finish_time
+        job_operation_index[job] += 1
+
+    # Si algún trabajo no ha completado todas sus operaciones, aplicar penalización
+    for job_idx in range(num_jobs):
+        if job_operation_index[job_idx] != len(processing_times[job_idx]) // 2:
+            penalty += 1000  # Penalización por operaciones no completadas
+
+    return max(machine_completion_time) + penalty
+
+
 
 
 
