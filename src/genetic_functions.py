@@ -87,27 +87,6 @@ def generate_chromosome(num_jobs, num_machines):
 
     return chromosome
 
-def generate_valid_chromosome(num_jobs, num_machines, processing_times):
-    """
-    Generates a valid chromosome for the Job-Shop Scheduling Problem.
-    The chromosome should respect all the constraints.
-    """
-    while True:
-        chromosome = create_random_chromosome(num_jobs, num_machines)  # Esta es la función que genera un cromosoma aleatorio
-        if validate_chromosome(chromosome, num_jobs, num_machines, processing_times):
-            return chromosome  # Si el cromosoma es válido, lo devolvemos
-        # Si no es válido, generamos uno nuevo
-
-def create_random_chromosome(num_jobs, num_machines):
-    """
-    Generates a random chromosome (job sequence).
-    This function should be implemented based on how you want to represent the chromosome.
-    For simplicity, here we just generate a random sequence of job indices.
-    """
-    chromosome = [random.randint(0, num_jobs - 1) for _ in range(num_jobs * num_machines)]
-    return chromosome
-
-
 
 ##################################
 ######### VALIDATION ############
